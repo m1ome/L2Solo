@@ -100,6 +100,14 @@ async function enter(a, coldLifeState) {
     const white=actor();white.flag=0;white.setPvpFlag=v=>{white.flag=v;};white.fetchPvpFlag=()=>white.flag;
     await enter(white,{stats:{coldCombat:{effects:[]},coldPvp:{flagUntil}}});
     assert.strictEqual(white.flag,0,'an expired flag is not revived by a handoff');
+    // Relog: passive skills load after the first stat pass, so the first max HP is too low.
+    ['skillsList','exStorageMaxCount','userInfo'].forEach(k=>patch(Response,k,()=>({})));
+    patch(Response.abnormalStatusUpdate,'fromActor',()=>({}));patch(Response.shortBuffStatusUpdate,'fromActor',()=>({}));
+    patch(Generics,'calculateStats',(_s,a)=>{a.maxHp=(Store.list(a).some(e=>e.key==='bless_the_body')?120:100)+(a.passives?30:0);});
+    const relog=actor([{...body,expiresAt:clock+60000}]);relog.hp=150;relog.fetchPvpFlag=()=>0;
+    relog.skillset.populateForActor=(_a,done)=>Promise.resolve().then(()=>{relog.passives=true;done();});
+    await enter(relog,undefined);
+    assert.strictEqual(relog.hp,150,'relog keeps the HP the character logged out with');
     console.log('Hot/cold effect handoff: SQLite close/reopen, native enter-world restoration, expiry, HP caps and rebuff planning passed');
  } finally {
     actors.forEach(a=>Ticker.clearAll(a));saved.reverse().forEach(fn=>fn());

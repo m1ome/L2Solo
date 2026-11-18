@@ -4,8 +4,10 @@ const CharacterStatus = invoke('GameServer/Actor/CharacterStatus');
 const ColdCombatProfile = invoke('GameServer/Bot/Population/ColdCombatProfile');
 const ServerResponse = invoke('GameServer/Network/Response');
 
-function refreshLoadedSkillState(session, actor, Generics, response = ServerResponse) {
+function refreshLoadedSkillState(session, actor, Generics, response = ServerResponse, vitals = undefined) {
     Generics.calculateStats(session, actor);
+    // The first pass ran without passive skills and clamped HP/MP/CP to too low a cap.
+    if (vitals) CharacterStatus.restoreVitals(actor, vitals);
     session.dataSendToMe?.(response.skillsList(actor.skillset.fetchSkills()));
     session.dataSendToMe?.(ServerResponse.exStorageMaxCount(actor));
     session.dataSendToMe?.(response.userInfo(actor));
@@ -60,7 +62,7 @@ async function enterWorld(session, actor) {
         // before Expertise is available and can temporarily apply the C4
         // grade penalty to correctly equipped characters.  Recalculate and
         // refresh the client once the real skillset is present.
-        refreshLoadedSkillState(session, actor, Generics);
+        refreshLoadedSkillState(session, actor, Generics, ServerResponse, vitals);
     });
 
     // Start vitals replenish
